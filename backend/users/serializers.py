@@ -1,8 +1,7 @@
 from django.contrib.auth import authenticate
-from django.http import Http404
 from django.shortcuts import get_object_or_404
+from rest_framework.authtoken.models import Token
 from rest_framework import exceptions, validators, serializers
-from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
 from .validators import UsernameValidator
@@ -17,17 +16,17 @@ class MyObtainTokenSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """Валидатор для 'email' и 'password'."""
-        user = get_object_or_404(User, email=data["email"])
+        user = get_object_or_404(User, email=data.get("email", None))
         authenticate_kwargs = {
             "username": user.username,
-            "password": data["password"],
+            "password": data.get("password", None),
         }
         user = authenticate(**authenticate_kwargs)
         if user is None:
             raise exceptions.ValidationError("Неверный email или пароль!")
-        refresh = RefreshToken.for_user(user)
+        token, created = Token.objects.get_or_create(user=user)
         return {
-            "auth_token": str(refresh.access_token),
+            "auth_token": str(token),
         }
 
 
@@ -61,16 +60,43 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     def get_is_subscribed(self, obj):
         """Проверка есть ли подписка"""
+
         return False
 
     def validate(self, data):
         """Проверка уникальности username и email"""
-        if User.objects.filter(email="email", username="username").exists():
+        if User.objects.filter(
+            email=data.get("email"), username=data.get("username")
+        ).exists():
             raise serializers.ValidationError(
-                "Пользователь с таким email уже сужествует!"
+                "Пользователь с таким email уже существует!"
             )
+
         return data
 
     def create(self, validated_data):
-        """Если пользователь уже создан взять существующего."""
-        return User.objects.get_or_create(**validated_data)
+        """Создание и установка пароля пользователя"""
+        user = User.objects.create_user(**validated_data)
+        return user
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Сериалайзер смены пароля"""
+
+    new_password = serializers.CharField(max_length=128, required=True)
+    current_password = serializers.CharField(max_length=128, required=True)
+
+    def validate_current_password(self, value):
+        """Проверка валидности текущего пароля"""
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Неверный пароль!")
+        return value
+
+    def create(self, validated_data):
+        """Смена пароля"""
+        user = self.context["request"].user
+        new_password = validated_data["new_password"]
+        user.set_password(new_password)
+        user.save()
+        return user
