@@ -36,10 +36,10 @@ class Recipe(models.Model):
         help_text="Добавьте изображение к рецепту",
     )
     text = models.TextField("Описание рецепта")
-    ingridients = models.ManyToManyField(
-        Ingredient, through="IngridientRecipe"
+    ingredients = models.ManyToManyField(
+        Ingredient, through="IngredientRecipe"
     )
-    tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
+    tags = models.ManyToManyField(Tag)
     cooking_time = models.PositiveIntegerField("Время приготовления в минутах")
     created = models.DateTimeField("дата создания", auto_now_add=True)
 
@@ -48,13 +48,13 @@ class Recipe(models.Model):
         verbose_name_plural = "рецепты"
 
 
-class IngridientRecipe(models.Model):
+class IngredientRecipe(models.Model):
     """Промежуточная модель связи ингридентов и рецептов"""
 
-    ingridient = models.ForeignKey(
-        Ingredient, on_delete=models.PROTECT, related_name="ingridient_recipe"
+    ingredient = models.ForeignKey(
+        Ingredient, on_delete=models.PROTECT, related_name="ingredient_recipe"
     )
-    recepie = models.ForeignKey(
-        Recipe, on_delete=models.CASCADE, related_name="recipe_ingridient"
+    recipe = models.ForeignKey(
+        Recipe, on_delete=models.CASCADE, related_name="recipe_ingredient"
     )
     amount = models.PositiveSmallIntegerField("Колличество")

@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from rest_framework.authtoken.models import Token
-from rest_framework import exceptions, validators, serializers
+from rest_framework import exceptions, serializers
 
 from .models import User
 from .validators import UsernameValidator
