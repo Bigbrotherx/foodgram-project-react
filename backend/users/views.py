@@ -1,14 +1,18 @@
-from rest_framework import views, status, generics, viewsets
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, status, views, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .models import User
-from .serializers import (
-    MyObtainTokenSerializer,
-    ProfileSerializer,
+from api.serializers import (
     ChangePasswordSerializer,
+    MyObtainTokenSerializer,
+    ProfileGetSerializer,
+    ProfileSerializer,
+    SubscriptionSerializer,
 )
+from users.models import Follow, User
 
 
 class ObtainTokenView(views.APIView):
@@ -27,10 +31,8 @@ class ObtainTokenView(views.APIView):
                 {"auth_token": serializer.validated_data.get("auth_token")},
                 status=status.HTTP_201_CREATED,
             )
-        else:
-            return Response(
-                serializer.errors, status=status.HTTP_400_BAD_REQUEST
-            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DeleteTokenView(views.APIView):
@@ -47,11 +49,11 @@ class DeleteTokenView(views.APIView):
             token.delete()
 
             return Response(status=status.HTTP_204_NO_CONTENT)
-        else:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
-class SingUpViewSet(
+class UsersViewSet(
     generics.ListCreateAPIView,
     generics.RetrieveAPIView,
     viewsets.GenericViewSet,
@@ -62,6 +64,7 @@ class SingUpViewSet(
     permission_classes = [
         AllowAny,
     ]
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         """Получение всех пользователей"""
@@ -74,11 +77,16 @@ class SingUpViewSet(
         permission_classes=[
             IsAuthenticated,
         ],
+        pagination_class=LimitOffsetPagination,
     )
     def me(self, request):
         """Профайл текущего пользователя."""
 
-        return Response(ProfileSerializer(self.request.user).data)
+        return Response(
+            self.serializer_class(
+                self.request.user, context={"request": request}
+            ).data
+        )
 
     @action(
         detail=False,
@@ -98,7 +106,60 @@ class SingUpViewSet(
             return Response(
                 status=status.HTTP_204_NO_CONTENT,
             )
-        else:
-            return Response(
-                serializer.errors, status=status.HTTP_400_BAD_REQUEST
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(
+        detail=True,
+        methods=["POST", "DELETE"],
+        url_path="subscribe",
+        permission_classes=[
+            IsAuthenticated,
+        ],
+    )
+    def subscribe(self, request, pk):
+        author = get_object_or_404(User, pk=pk)
+        if request.method == "POST":
+            serializer = SubscriptionSerializer(
+                data={"user": request.user.pk, "author": author.pk}
             )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(
+                ProfileGetSerializer(
+                    context={"request": request}, instance=author
+                ).data
+            )
+
+        instance = get_object_or_404(Follow, author=author, user=request.user)
+        deleted = instance.delete()
+        if deleted:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="subscriptions",
+        permission_classes=[
+            IsAuthenticated,
+        ],
+    )
+    def subscriptions(self, request):
+        """Получить все подписки пользователя"""
+        queryset = User.objects.filter(following__user=request.user)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = ProfileGetSerializer(
+                page, many=True, context={"request": request}
+            )
+            return self.get_paginated_response(serializer.data)
+
+        return Response(
+            ProfileGetSerializer(
+                queryset,
+                many=True,
+                context={"request": request},
+            ).data
+        )

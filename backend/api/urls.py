@@ -1,13 +1,14 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework import routers
 
-from users.views import SingUpViewSet, ObtainTokenView, DeleteTokenView
-from .views import TagViewSet, RecipeViewSet, IngredientViewSet
+from users.views import DeleteTokenView, ObtainTokenView, UsersViewSet
+
+from .views import IngredientViewSet, RecipeViewSet, TagViewSet
 
 app_name = "api"
 
 router_v1 = routers.DefaultRouter()
-router_v1.register(r"users", SingUpViewSet, basename="users")
+router_v1.register(r"users", UsersViewSet, basename="users")
 router_v1.register(r"tags", TagViewSet, basename="tags")
 router_v1.register(r"ingredients", IngredientViewSet, basename="ingredient")
 router_v1.register(r"recipes", RecipeViewSet, basename="recipes")

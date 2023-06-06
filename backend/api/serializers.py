@@ -1,11 +1,74 @@
 import base64
 
-from rest_framework import exceptions, serializers
+from django.contrib.auth import authenticate
 from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
+from rest_framework import exceptions, serializers
+from rest_framework.authtoken.models import Token
 
-from recipes.models import Tag, Recipe, Ingredient, IngredientRecipe
-from users.serializers import ProfileSerializer
+from api.validators import UsernameValidator
+from recipes.models import (
+    Favorite,
+    Ingredient,
+    IngredientRecipe,
+    Recipe,
+    ShoppingCart,
+    Tag,
+)
+from users.models import Follow, User
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    """Сериализатор профиля пользователя."""
+
+    is_subscribed = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        fields = (
+            "email",
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "password",
+            "is_subscribed",
+        )
+        read_only_fields = ("id", "is_subscribed")
+        extra_kwargs = {
+            "username": {
+                "validators": [
+                    UsernameValidator(),
+                ],
+            },
+            "password": {
+                "write_only": True,
+            },
+        }
+        model = User
+
+    def get_is_subscribed(self, obj):
+        """Подписан ли на пользователя"""
+        user = self.context.get("request").user
+        if user.is_authenticated:
+            return user.follower.filter(author=obj).exists()
+
+        return False
+
+    def validate(self, data):
+        """Проверка уникальности username и email"""
+        if User.objects.filter(
+            email=data.get("email"), username=data.get("username")
+        ).exists():
+            raise serializers.ValidationError(
+                "Пользователь с таким email уже существует!"
+            )
+
+        return data
+
+    def create(self, validated_data):
+        """Создание и установка пароля пользователя"""
+
+        return User.objects.create_user(**validated_data)
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -72,11 +135,11 @@ class IngredientRecipeSerializer(serializers.ModelSerializer):
 class RecipesGETSerializer(serializers.ModelSerializer):
     """GET Сериалайзер рецептов"""
 
-    image = Base64ImageField(required=True)
+    image = Base64ImageField(required=True, use_url=False)
     ingredients = IngredientRecipeSerializer(
         many=True, source="recipe_ingredient.all"
     )
-    author = ProfileSerializer(read_only=True)
+    author = serializers.SerializerMethodField()
     tags = TagSerializer(many=True)
     is_in_shopping_cart = serializers.SerializerMethodField()
     is_favorited = serializers.SerializerMethodField()
@@ -103,11 +166,23 @@ class RecipesGETSerializer(serializers.ModelSerializer):
 
     def get_is_in_shopping_cart(self, obj):
         """Находится ли в списке покупок"""
+        user = self.context.get("request").user
+        if user.is_authenticated:
+            return ShoppingCart.objects.filter(user=user, recipe=obj).exists()
         return False
 
     def get_is_favorited(self, obj):
         """Находится ли в списке избранного"""
+        user = self.context.get("request").user
+        if user.is_authenticated:
+            return Favorite.objects.filter(user=user, recipe=obj).exists()
         return False
+
+    def get_author(self, obj):
+        """Передача контекста в сериализатор профиля"""
+        return ProfileSerializer(
+            instance=obj.author, read_only=True, context=self.context
+        ).data
 
 
 class RecipesSerializer(serializers.ModelSerializer):
@@ -185,5 +260,184 @@ class RecipesSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         """Представление объекта после создания/изменения"""
-        representation = RecipesGETSerializer(instance=instance)
+        representation = RecipesGETSerializer(
+            instance=instance, context=self.context
+        )
         return representation.data
+
+
+class RecipeShortSerializer(serializers.ModelSerializer):
+    """Короткий сериалайзер рецепта"""
+
+    image = Base64ImageField(read_only=True)
+
+    class Meta:
+        fields = ("id", "name", "image", "cooking_time")
+        read_only_fields = ("id", "name", "image", "cooking_time")
+        model = Recipe
+
+
+class FavoriteSerializer(serializers.ModelSerializer):
+    """Сериалайзер избранного"""
+
+    class Meta:
+        fields = (
+            "id",
+            "user",
+            "recipe",
+        )
+        write_only_fields = (
+            "user",
+            "recipe",
+        )
+        model = Favorite
+        validators = [
+            serializers.UniqueTogetherValidator(
+                queryset=model.objects.all(),
+                fields=("user", "recipe"),
+                message="Вы уже добавили этот рецепт",
+            ),
+        ]
+
+
+class ShoppingCartSerializer(serializers.ModelSerializer):
+    """Сериалайзер списка покупок"""
+
+    class Meta:
+        fields = (
+            "id",
+            "user",
+            "recipe",
+        )
+        write_only_fields = (
+            "user",
+            "recipe",
+        )
+        model = ShoppingCart
+        validators = [
+            serializers.UniqueTogetherValidator(
+                queryset=model.objects.all(),
+                fields=("user", "recipe"),
+                message="Вы уже добавили этот рецепт",
+            ),
+        ]
+
+
+class ProfileGetSerializer(serializers.ModelSerializer):
+    """Сериализатор пользователя с рецептами доступен только на чтение"""
+
+    is_subscribed = serializers.SerializerMethodField(read_only=True)
+    recipes = RecipeShortSerializer(read_only=True, many=True)
+    recipes_count = serializers.SerializerMethodField()
+
+    class Meta:
+        fields = (
+            "email",
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "is_subscribed",
+            "recipes",
+            "recipes_count",
+        )
+        read_only_fields = (
+            "email",
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "is_subscribed",
+            "recipes",
+            "recipes_count",
+        )
+        model = User
+
+    def get_recipes_count(self, obj):
+        """Кол-во рецептов пользователя"""
+        return obj.recipes.count()
+
+    def get_is_subscribed(self, obj):
+        """Подписан ли на пользователя"""
+        user = self.context["request"].user
+        if user.is_authenticated:
+            return user.follower.filter(author=obj).exists()
+        else:
+            return False
+
+
+class MyObtainTokenSerializer(serializers.ModelSerializer):
+    """Сериализатор получения токена для зарегистрированного пользователя."""
+
+    class Meta:
+        model = User
+        fields = ("password", "email")
+
+    def validate(self, data):
+        """Валидатор для 'email' и 'password'."""
+        user = get_object_or_404(User, email=data.get("email", None))
+        authenticate_kwargs = {
+            "username": user.username,
+            "password": data.get("password", None),
+        }
+        user = authenticate(**authenticate_kwargs)
+        if user is None:
+            raise exceptions.ValidationError("Неверный email или пароль!")
+        token, created = Token.objects.get_or_create(user=user)
+        return {
+            "auth_token": str(token),
+        }
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Сериалайзер смены пароля"""
+
+    new_password = serializers.CharField(max_length=128, required=True)
+    current_password = serializers.CharField(max_length=128, required=True)
+
+    def validate_current_password(self, value):
+        """Проверка валидности текущего пароля"""
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Неверный пароль!")
+        return value
+
+    def create(self, validated_data):
+        """Смена пароля"""
+        user = self.context["request"].user
+        new_password = validated_data["new_password"]
+        user.set_password(new_password)
+        user.save()
+        return user
+
+
+class SubscriptionSerializer(serializers.ModelSerializer):
+    """Сериалайзер подписок"""
+
+    class Meta:
+        fields = (
+            "id",
+            "user",
+            "author",
+        )
+        write_only_fields = (
+            "user",
+            "author",
+        )
+        model = Follow
+        validators = [
+            serializers.UniqueTogetherValidator(
+                queryset=model.objects.all(),
+                fields=("user", "author"),
+                message="Вы уже подписанны на этого пользователя",
+            ),
+        ]
+
+    def validate(self, data):
+        """Валидация само-подписки"""
+        if data["user"] == data["author"]:
+            raise serializers.ValidationError(
+                "Нельзя подписаться на самого себя!"
+            )
+
+        return data

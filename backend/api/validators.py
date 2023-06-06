@@ -1,9 +1,9 @@
-from django.db import models
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.db import models
 from rest_framework import serializers
 from rest_framework.validators import ValidationError
 
-from .models import User
+from users.models import User
 
 
 class UsernameValidator(UnicodeUsernameValidator):
