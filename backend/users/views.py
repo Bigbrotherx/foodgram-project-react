@@ -7,7 +7,7 @@ from rest_framework.response import Response
 
 from api.serializers import (
     ChangePasswordSerializer,
-    MyObtainTokenSerializer,
+    ObtainTokenSerializer,
     ProfileGetSerializer,
     ProfileSerializer,
     SubscriptionSerializer,
@@ -18,7 +18,7 @@ from users.models import Follow, User
 class ObtainTokenView(views.APIView):
     """Генерирет Acceess_token при получении email и password"""
 
-    serializer_class = MyObtainTokenSerializer
+    serializer_class = ObtainTokenSerializer
     permission_classes = [
         AllowAny,
     ]

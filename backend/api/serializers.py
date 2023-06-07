@@ -168,14 +168,14 @@ class RecipesGETSerializer(serializers.ModelSerializer):
         """Находится ли в списке покупок"""
         user = self.context.get("request").user
         if user.is_authenticated:
-            return ShoppingCart.objects.filter(user=user, recipe=obj).exists()
+            return user.cart.exists()
         return False
 
     def get_is_favorited(self, obj):
         """Находится ли в списке избранного"""
         user = self.context.get("request").user
         if user.is_authenticated:
-            return Favorite.objects.filter(user=user, recipe=obj).exists()
+            return user.favorite.exists()
         return False
 
     def get_author(self, obj):
@@ -218,19 +218,30 @@ class RecipesSerializer(serializers.ModelSerializer):
 
         return value
 
+    def ingredient_recipe_bulk_create(self, recipe, ingredients):
+        """Метод множественного создания связи ингрииентов с рецептом"""
+        IngredientRecipe.objects.bulk_create(
+            [
+                IngredientRecipe(
+                    recipe=recipe,
+                    ingredient=get_object_or_404(
+                        Ingredient, pk=elem.get("ingredient").get("id")
+                    ),
+                    amount=elem.get("amount"),
+                )
+                for elem in ingredients.get("all")
+            ]
+        )
+
     def create(self, validated_data):
         """Создание нового рецепта"""
         ingredients = validated_data.pop("recipe_ingredient")
         tags = validated_data.pop("tags")
         recipe = Recipe.objects.create(**validated_data)
         recipe.tags.set(tags)
-        for elem in ingredients.get("all"):
-            ingredient = get_object_or_404(
-                Ingredient, pk=elem.get("ingredient").get("id")
-            )
-            IngredientRecipe.objects.create(
-                recipe=recipe, ingredient=ingredient, amount=elem.get("amount")
-            )
+        self.ingredient_recipe_bulk_create(
+            recipe=recipe, ingredients=ingredients
+        )
         return recipe
 
     def update(self, instance, validated_data):
@@ -244,18 +255,12 @@ class RecipesSerializer(serializers.ModelSerializer):
         instance.cooking_time = validated_data.get(
             "cooking_time", instance.cooking_time
         )
-        IngredientRecipe.objects.filter(recipe=instance).delete()
+        instance.recipe_ingredient.all().delete()
         instance.tags.set(tags)
         instance.save()
-        for elem in ingredients.get("all"):
-            ingredient = get_object_or_404(
-                Ingredient, pk=elem.get("ingredient").get("id")
-            )
-            IngredientRecipe.objects.create(
-                recipe=instance,
-                ingredient=ingredient,
-                amount=elem.get("amount"),
-            )
+        self.ingredient_recipe_bulk_create(
+            recipe=instance, ingredients=ingredients
+        )
         return instance
 
     def to_representation(self, instance):
@@ -362,11 +367,11 @@ class ProfileGetSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         if user.is_authenticated:
             return user.follower.filter(author=obj).exists()
-        else:
-            return False
+
+        return False
 
 
-class MyObtainTokenSerializer(serializers.ModelSerializer):
+class ObtainTokenSerializer(serializers.ModelSerializer):
     """Сериализатор получения токена для зарегистрированного пользователя."""
 
     class Meta:

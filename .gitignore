@@ -133,3 +133,4 @@ dmypy.json
 
 media/
 static/
+backend/requirements.in

@@ -17,6 +17,7 @@ class IngredientInline(admin.TabularInline):
 
     model = IngredientRecipe
     extra = 1
+    min_num = 1
     verbose_name_plural = "Ингридиенты использованные в рецепте"
 
 

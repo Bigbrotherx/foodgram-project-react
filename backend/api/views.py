@@ -103,15 +103,15 @@ class RecipeViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(RecipeShortSerializer(instance=recipe).data)
-        else:
-            instance = get_object_or_404(
-                Favorite, recipe=recipe, user=request.user
-            )
-            deleted = instance.delete()
-            if deleted:
-                return Response(status=status.HTTP_204_NO_CONTENT)
-            else:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        instance = get_object_or_404(
+            Favorite, recipe=recipe, user=request.user
+        )
+        deleted = instance.delete()
+        if deleted:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
     @action(
         detail=True,
@@ -131,15 +131,15 @@ class RecipeViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(RecipeShortSerializer(instance=recipe).data)
-        else:
-            instance = get_object_or_404(
-                ShoppingCart, recipe=recipe, user=request.user
-            )
-            deleted = instance.delete()
-            if deleted:
-                return Response(status=status.HTTP_204_NO_CONTENT)
-            else:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        instance = get_object_or_404(
+            ShoppingCart, recipe=recipe, user=request.user
+        )
+        deleted = instance.delete()
+        if deleted:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
     @action(
         detail=False,

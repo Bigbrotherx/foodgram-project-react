@@ -55,6 +55,7 @@ class Follow(models.Model):
         ]
         verbose_name = "подписка"
         verbose_name_plural = "подписки"
+        ordering = ("-author__id",)
 
     def __str__(self) -> str:
         """Стринг метод"""

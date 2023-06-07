@@ -14,6 +14,7 @@ class Tag(models.Model):
     class Meta:
         verbose_name = "тег"
         verbose_name_plural = "теги"
+        ordering = ("name",)
 
     def __str__(self) -> str:
         """Строковое представление модели"""
@@ -29,6 +30,7 @@ class Ingredient(models.Model):
     class Meta:
         verbose_name = "ингридиент"
         verbose_name_plural = "ингридиенты"
+        ordering = ("name",)
 
     def __str__(self) -> str:
         """Строковое представление модели"""
@@ -62,6 +64,7 @@ class Recipe(models.Model):
     class Meta:
         verbose_name = "рецепт"
         verbose_name_plural = "рецепты"
+        ordering = ("-created",)
 
     def __str__(self) -> str:
         """Строковое представление модели"""
@@ -79,6 +82,18 @@ class IngredientRecipe(models.Model):
     )
     amount = models.PositiveSmallIntegerField("Колличество")
 
+    class Meta:
+        verbose_name = "ингредиент в рецепте"
+        verbose_name_plural = "ингридиенты в рецепте"
+        ordering = ("-recipe__created",)
+
+    def __str__(self) -> str:
+        """Строковое представление модели"""
+        return (
+            f"В {self.recipe.name} использовано "
+            f"{self.ingredient.count()} ингредиентов"
+        )
+
 
 class ShoppingCart(models.Model):
     """Список покупок"""
@@ -93,6 +108,7 @@ class ShoppingCart(models.Model):
     class Meta:
         verbose_name = "список покупок"
         verbose_name_plural = "списки покупок"
+        ordering = ("-recipe__created",)
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "recipe"], name="unique_recipe_cart"
@@ -117,6 +133,7 @@ class Favorite(models.Model):
     class Meta:
         verbose_name = "избранный рецепт"
         verbose_name_plural = "избранные рецепты"
+        ordering = ("-recipe__created",)
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "recipe"], name="unique_recipe_favorite"
