@@ -24,18 +24,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY", default="SomeString")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [
-    "localhost",
+    "frontend",
     "backend",
-    "127.0.0.1",
+    "localhost",
 ]
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost"]
+CSRF_TRUSTED_ORIGINS = [
+    "http://frontend",
+    "http://backend",
+    "http://51.250.87.223",
+]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
+    "http://frontend:3000",
+    "http://51.250.87.223",
 ]
 
 
@@ -100,7 +105,7 @@ DATABASES = {
         "NAME": os.getenv("DB_NAME", default="postgres"),
         "USER": os.getenv("POSTGRES_USER", default="postgres"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD", default="postgres"),
-        "HOST": os.getenv("DB_HOST", default="db"),
+        "HOST": os.getenv("DB_HOST", default="localhost"),
         "PORT": os.getenv("DB_PORT", default="5432"),
     }
 }

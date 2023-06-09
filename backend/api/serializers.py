@@ -2,6 +2,7 @@ import base64
 
 from django.contrib.auth import authenticate
 from django.core.files.base import ContentFile
+from django.core.validators import MinValueValidator
 from django.shortcuts import get_object_or_404
 from rest_framework import exceptions, serializers
 from rest_framework.authtoken.models import Token
@@ -168,14 +169,14 @@ class RecipesGETSerializer(serializers.ModelSerializer):
         """Находится ли в списке покупок"""
         user = self.context.get("request").user
         if user.is_authenticated:
-            return user.cart.exists()
+            return user.cart.filter(recipe=obj).exists()
         return False
 
     def get_is_favorited(self, obj):
         """Находится ли в списке избранного"""
         user = self.context.get("request").user
         if user.is_authenticated:
-            return user.favorite.exists()
+            return user.favorite.filter(recipe=obj).exists()
         return False
 
     def get_author(self, obj):
@@ -188,7 +189,7 @@ class RecipesGETSerializer(serializers.ModelSerializer):
 class RecipesSerializer(serializers.ModelSerializer):
     """Сериалайзер рецептов"""
 
-    image = Base64ImageField(required=True)
+    image = Base64ImageField(required=True, use_url=False)
     ingredients = IngredientRecipeSerializer(
         many=True, source="recipe_ingredient.all"
     )
@@ -205,6 +206,16 @@ class RecipesSerializer(serializers.ModelSerializer):
             "text",
             "cooking_time",
         )
+        extra_kwargs = {
+            "cooking_time": {
+                "validators": [
+                    MinValueValidator(
+                        limit_value=1,
+                        message="Время готовки должно быть больше 0",
+                    ),
+                ]
+            },
+        }
 
     def validate_ingredients(self, value):
         """Валидация тегов"""
@@ -274,7 +285,7 @@ class RecipesSerializer(serializers.ModelSerializer):
 class RecipeShortSerializer(serializers.ModelSerializer):
     """Короткий сериалайзер рецепта"""
 
-    image = Base64ImageField(read_only=True)
+    image = Base64ImageField(read_only=True, use_url=False)
 
     class Meta:
         fields = ("id", "name", "image", "cooking_time")
