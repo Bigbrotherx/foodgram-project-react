@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from api.filters import RecipeFilterSet, NameSearchFilter
@@ -17,6 +17,13 @@ from api.serializers import (
     TagSerializer,
 )
 from recipes.models import Favorite, Ingredient, Recipe, ShoppingCart, Tag
+
+
+class CustomPaginator(PageNumberPagination):
+    """Настройки пагинатора"""
+
+    page_size = 6
+    page_size_query_param = "limit"
 
 
 class TagViewSet(
@@ -56,7 +63,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permissions.IsAuthenticatedOrReadOnly,
     ]
     queryset = Recipe.objects.all()
-    pagination_class = LimitOffsetPagination
+    pagination_class = CustomPaginator
     filter_backends = (
         DjangoFilterBackend,
         filters.OrderingFilter,

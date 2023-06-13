@@ -218,7 +218,20 @@ class RecipesSerializer(serializers.ModelSerializer):
         }
 
     def validate_ingredients(self, value):
-        """Валидация тегов"""
+        """Валидация ингрeдиентов"""
+        ingredients_ids = [val.get("ingredient").get("id") for val in value]
+        if (
+            max(list(map(lambda x: ingredients_ids.count(x), ingredients_ids)))
+            > 1
+        ):
+            raise serializers.ValidationError(
+                "Повторяющиеся ингредиенты недопустимы!"
+            )
+        if len(value) == 0:
+            raise serializers.ValidationError(
+                "Нельзя сохранить рецепт без ингредиентов!"
+            )
+
         for val in value:
             if not Ingredient.objects.filter(
                 pk=val.get("ingredient").get("id")

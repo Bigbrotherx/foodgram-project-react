@@ -91,7 +91,7 @@ class IngredientRecipe(models.Model):
         """Строковое представление модели"""
         return (
             f"В {self.recipe.name} использовано "
-            f"{self.ingredient.count()} ингредиентов"
+            f"{self.recipe.recipe_ingredient.count()} ингредиентов"
         )
 
 

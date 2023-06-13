@@ -24,18 +24,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY", default="SomeString")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = [
     "frontend",
     "backend",
     "localhost",
+    "127.0.0.1",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://frontend",
     "http://backend",
     "http://51.250.87.223",
+    "http://localhost",
 ]
 
 CORS_ALLOWED_ORIGINS = [
